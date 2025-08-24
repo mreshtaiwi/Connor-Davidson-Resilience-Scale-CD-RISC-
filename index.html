@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>مقياس المرونة (CD‑RISC‑10)</title>
+  <style>
+    :root {
+      --bg: #0f172a;       /* slate-900 */
+      --card: #111827;     /* gray-900 */
+      --muted: #94a3b8;    /* slate-400 */
+      --text: #e5e7eb;     /* gray-200 */
+      --accent: #22c55e;   /* green-500 */
+      --accent-2: #06b6d4; /* cyan-500 */
+      --danger: #ef4444;   /* red-500 */
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 18px;
+    }
+    body { margin:0; background: radial-gradient(1000px 600px at 80% -200px, rgba(34,197,94,.15), transparent),
+                               radial-gradient(800px 500px at -100px 100%, rgba(6,182,212,.12), transparent),
+                               var(--bg);
+           color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Cairo, Tahoma, sans-serif; }
+    .wrap { max-width: 1000px; margin: 32px auto; padding: 0 16px; }
+    header { display:flex; flex-direction: column; gap:10px; margin-bottom: 18px; }
+    .title { font-weight: 800; letter-spacing: .2px; font-size: clamp(24px, 3vw, 34px); }
+    .subtitle { color: var(--muted); line-height: 1.7; }
+
+    .card { background: linear-gradient(180deg, rgba(17,24,39,.95), rgba(15,23,42,.95)); border: 1px solid rgba(148,163,184,.18);
+            box-shadow: var(--shadow); border-radius: var(--radius); padding: 18px; }
+
+    .grid { display:grid; grid-template-columns: 1fr; gap: 14px; }
+
+    .item { background: rgba(2,6,23,.35); border: 1px solid rgba(148,163,184,.15); border-radius: 16px; padding: 14px; }
+    .question { font-weight: 600; margin-bottom: 8px; }
+
+    .scale { display:flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .opt { display:flex; align-items:center; gap:6px; background: rgba(255,255,255,.03); border: 1px solid rgba(148,163,184,.15);
+           padding:8px 10px; border-radius: 12px; cursor:pointer; }
+    input[type="radio"] { transform: scale(1.1); accent-color: var(--accent); }
+
+    .legend { display:flex; gap: 10px; align-items:center; color: var(--muted); font-size: 14px; margin-top: 6px; }
+    .badge { border: 1px dashed rgba(148,163,184,.35); border-radius: 999px; padding: 4px 10px; }
+
+    .actions { display:flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+    .btn { border: 0; border-radius: 14px; padding: 12px 16px; font-weight: 700; cursor:pointer; }
+    .primary { background: linear-gradient(135deg, var(--accent), #16a34a); color: #06281a; }
+    .secondary { background: linear-gradient(135deg, var(--accent-2), #0891b2); color: #03242a; }
+    .ghost { background: transparent; color: var(--text); border: 1px solid rgba(148,163,184,.25); }
+
+    .result { margin-top: 16px; display:none; }
+    .result .score { font-size: clamp(22px, 2.6vw, 28px); font-weight: 800; }
+    .result .bar { height: 10px; background: rgba(148,163,184,.2); border-radius: 999px; overflow:hidden; margin: 10px 0 2px; }
+    .result .fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .5s ease; }
+    .hint { color: var(--muted); font-size: 14px; }
+
+    .footer { color: var(--muted); margin-top: 22px; font-size: 13px; }
+    .error { color: var(--danger); font-weight:700; display:none; }
+    .sticky-top { position: sticky; top: 0; z-index: 5; padding: 8px 0 12px; backdrop-filter: blur(6px); margin-bottom: 8px; }
+
+    @media (min-width: 900px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="title">مقياس المرونة الشخصية – CD‑RISC‑10</div>
+      <div class="subtitle">اختر الإجابة الأنسب لكل عبارة وفق المقياس: 0 = أبداً، 1 = نادراً جداً، 2 = أحياناً، 3 = غالباً، 4 = دائماً تقريباً. بعد الإجابة سيظهر مجموعك وتفسير مختصر.</div>
+    </header>
+
+    <div class="card">
+      <div class="sticky-top">
+        <div class="legend">
+          <span class="badge">0 أبداً</span>
+          <span class="badge">1 نادراً جداً</span>
+          <span class="badge">2 أحياناً</span>
+          <span class="badge">3 غالباً</span>
+          <span class="badge">4 دائماً تقريباً</span>
+          <span class="badge" id="progress-badge">تقدّم: 0/10</span>
+        </div>
+      </div>
+
+      <form id="form">
+        <div class="grid" id="questions"></div>
+        <div class="actions">
+          <button type="submit" class="btn primary">احسب الدرجة</button>
+          <button type="button" class="btn secondary" id="resetBtn">إعادة ضبط</button>
+          <button type="button" class="btn ghost" id="printBtn">طباعة / حفظ PDF</button>
+        </div>
+        <div id="error" class="error">رجاءً أجب عن جميع العبارات (10 من 10).</div>
+      </form>
+
+      <div id="result" class="result">
+        <div class="score">درجتك: <span id="score">0</span> / 40</div>
+        <div class="bar"><div class="fill" id="fill"></div></div>
+        <div class="hint"><span id="level"></span> — <span id="tip"></span></div>
+      </div>
+
+      <div class="footer">هذا النموذج للاستخدام التوعوي والتدريبي وليس تشخيصاً طبياً. يمكنك تكراره لاحقاً لمتابعة تقدمك.</div>
+    </div>
+  </div>
+
+  <script>
+    const items = [
+      "أستطيع التكيف مع التغيرات.",
+      "أستطيع التعامل مع أي موقف صعب.",
+      "أحاول دائماً أن أنظر إلى الجانب المشرق من الأمور.",
+      "عندما أتعرض لمشكلة، أجد طريقة لتجاوزها.",
+      "في الأوقات الصعبة، أستطيع أن أبقى مركزاً وواضح التفكير.",
+      "أستطيع أن أتصرف بفعالية حتى لو كنت متوتراً.",
+      "أستطيع مواجهة أي حدث مهما كان صعباً.",
+      "عادةً ما أتعافى بسرعة بعد المواقف العصيبة.",
+      "حتى لو بدا الأمر مستحيلاً، لا أستسلم بسهولة.",
+      "أعتقد أنني أمتلك القوة الداخلية التي تساعدني على الاستمرار."
+    ];
+
+    const grid = document.getElementById('questions');
+    const progressBadge = document.getElementById('progress-badge');
+
+    function renderQuestions() {
+      grid.innerHTML = '';
+      items.forEach((q, idx) => {
+        const id = `q${idx}`;
+        const block = document.createElement('div');
+        block.className = 'item';
+        block.innerHTML = `
+          <div class="question">${idx+1}. ${q}</div>
+          <div class="scale" role="radiogroup" aria-labelledby="${id}-label">
+            ${[0,1,2,3,4].map(v => `
+              <label class="opt">
+                <input type="radio" name="${id}" value="${v}">
+                <span>${v}</span>
+              </label>
+            `).join('')}
+          </div>
+        `;
+        grid.appendChild(block);
+      });
+    }
+
+    function getAnsweredCount() {
+      let c = 0;
+      items.forEach((_, idx) => {
+        const name = `q${idx}`;
+        if (document.querySelector(`input[name="${name}"]:checked`)) c++;
+      });
+      return c;
+    }
+
+    function updateProgress() {
+      const answered = getAnsweredCount();
+      progressBadge.textContent = `تقدّم: ${answered}/10`;
+    }
+
+    function interpret(score) {
+      if (score >= 30) return { level: 'مرونة عالية', tip: 'استمر في ممارساتك الحالية (تنظيم الضغط، إعادة التقييم المعرفي، دعم اجتماعي).'};
+      if (score >= 20) return { level: 'مرونة متوسطة', tip: 'طوّر عادات تعزيز المرونة مثل تدوين الدروس، طلب الدعم، وتقنيات التنفس.'};
+      return { level: 'مرونة منخفضة', tip: 'ابدأ بخطوات صغيرة: النوم الجيد، نشاط بدني خفيف، تقنيات تهدئة، وخطة لمواجهة التحديات.'};
+    }
+
+    document.addEventListener('change', (e) => {
+      if (e.target.matches('input[type="radio"]')) updateProgress();
+    });
+
+    document.getElementById('form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const error = document.getElementById('error');
+      const result = document.getElementById('result');
+      const scoreEl = document.getElementById('score');
+      const fill = document.getElementById('fill');
+      const levelEl = document.getElementById('level');
+      const tipEl = document.getElementById('tip');
+
+      let total = 0; let answered = 0;
+      items.forEach((_, idx) => {
+        const name = `q${idx}`;
+        const checked = document.querySelector(`input[name="${name}"]:checked`);
+        if (checked) { total += Number(checked.value); answered++; }
+      });
+
+      if (answered < items.length) {
+        error.style.display = 'block';
+        result.style.display = 'none';
+        return;
+      }
+
+      error.style.display = 'none';
+      scoreEl.textContent = total;
+      const pct = Math.round((total / 40) * 100);
+      fill.style.width = pct + '%';
+      const { level, tip } = interpret(total);
+      levelEl.textContent = level;
+      tipEl.textContent = tip;
+      result.style.display = 'block';
+      result.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      document.querySelectorAll('input[type="radio"]').forEach(i => i.checked = false);
+      document.getElementById('result').style.display = 'none';
+      document.getElementById('error').style.display = 'none';
+      document.getElementById('fill').style.width = '0%';
+      document.getElementById('score').textContent = '0';
+      updateProgress();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+    // init
+    renderQuestions();
+    updateProgress();
+  </script>
+</body>
+</html>
